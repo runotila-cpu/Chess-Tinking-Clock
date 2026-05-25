@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Düşünce Saati</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Düşünce Saati">
+<meta name="theme-color" content="#08080f">
+<link rel="manifest" id="pwa-manifest">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#08080f;
+  --surface:#10101a;
+  --surface2:#181825;
+  --border:#25253a;
+  --dim:#44445a;
+  --mid:#7777aa;
+  --text:#cccce0;
+  --amber:#f0a020;
+  --amber-lo:rgba(240,160,32,0.12);
+  --red:#e04040;
+  --red-lo:rgba(224,64,64,0.10);
+  --green:#30b060;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow:hidden;user-select:none;}
+#app{display:flex;flex-direction:column;height:100vh;}
+
+/* ── Player zones ── */
+.pzone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:background .3s,border-color .3s;border:2px solid transparent;}
+.pzone.p2{transform:rotate(180deg);border-bottom:2px solid var(--border);}
+.pzone.p1{border-top:2px solid var(--border);}
+.pzone.idle{background:var(--surface);}
+.pzone.active{background:var(--amber-lo);border-color:var(--amber)!important;}
+.pzone.overtime-zone{background:var(--red-lo);border-color:var(--red)!important;}
+.pzone.dead{background:rgba(224,64,64,0.15);}
+
+.plabel{font-size:13px;letter-spacing:5px;text-transform:uppercase;color:var(--dim);margin-bottom:14px;}
+
+.timer{font-family:'Orbitron',monospace;font-size:104px;font-weight:700;letter-spacing:6px;line-height:1;color:var(--mid);transition:color .3s;}
+.pzone.active .timer{color:var(--amber);}
+.pzone.overtime-zone .timer{color:var(--red);animation:blink .9s ease-in-out infinite;}
+.pzone.dead .timer{color:var(--red);opacity:.7;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+.psub{font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--dim);margin-top:18px;}
+.ot-badge{display:none;font-size:10px;letter-spacing:2px;text-transform:uppercase;background:rgba(224,64,64,.18);color:var(--red);border:1px solid rgba(224,64,64,.5);border-radius:4px;padding:3px 12px;margin-top:10px;}
+.pzone.overtime-zone .ot-badge{display:block;}
+
+/* tap ripple */
+.pzone::after{content:'';position:absolute;inset:0;border-radius:inherit;background:rgba(255,255,255,0);pointer-events:none;transition:background .1s;}
+.pzone.tapped::after{background:rgba(255,255,255,0.06);}
+
+/* ── Controls bar ── */
+.controls{position:relative;height:88px;background:var(--surface2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-shrink:0;}
+.cbtn{width:68px;height:68px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);color:var(--mid);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:all .15s;font-family:'Rajdhani',sans-serif;position:absolute;top:50%;transform:translateY(-50%);}
+.cbtn:hover{border-color:var(--dim);background:var(--surface2);color:var(--text);}
+.cbtn:active{transform:translateY(-50%) scale(.95);}
+.cbtn .ico{font-size:22px;line-height:1;}
+.cbtn .lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;}
+.cbtn.danger{border-color:rgba(224,64,64,.4);color:var(--red);}
+.cbtn.danger:hover{background:rgba(224,64,64,.1);}
+#btn-reset{left:calc(25% - 34px);}
+#btn-settings{left:calc(75% - 34px);}
+.cinfo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;}
+.cinfo .ctitle{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);}
+.cinfo .cval{font-family:'Orbitron',monospace;font-size:14px;color:var(--mid);margin-top:5px;}
+.cinfo .ctip{font-size:10px;letter-spacing:1px;color:var(--dim);margin-top:6px;opacity:.6;}
+
+/* ── Settings overlay ── */
+#soverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:center;justify-content:center;}
+#soverlay.open{display:flex;}
+.spanel{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:32px 36px;width:500px;max-width:92vw;}
+.spanel h2{font-family:'Orbitron',monospace;font-size:14px;letter-spacing:3px;color:var(--amber);margin-bottom:28px;text-transform:uppercase;}
+.ssec{margin-bottom:22px;}
+.ssec h3{font-size:11px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.srow{display:flex;align-items:center;margin-bottom:10px;}
+.slab{font-size:14px;color:var(--mid);flex:1;}
+.tinp{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;}
+.tinp input[type=number]{background:none;border:none;outline:none;color:var(--text);font-family:'Orbitron',monospace;font-size:20px;width:42px;text-align:center;-moz-appearance:textfield;}
+.tinp input[type=number]::-webkit-outer-spin-button,.tinp input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+.tinp .sep{color:var(--dim);font-family:'Orbitron',monospace;font-size:20px;}
+.tog{width:46px;height:26px;background:var(--border);border-radius:13px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.tog.on{background:var(--amber);}
+.tog::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform .2s;}
+.tog.on::after{transform:translateX(20px);}
+.sacts{display:flex;gap:12px;margin-top:28px;}
+.s-cancel,.s-apply{flex:1;padding:13px;border-radius:10px;font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+.s-cancel{background:none;border:1px solid var(--border);color:var(--mid);}
+.s-cancel:hover{border-color:var(--mid);color:var(--text);}
+.s-apply{background:var(--amber);border:none;color:#000;font-weight:700;}
+.s-apply:hover{background:#dB9010;}
+.hint{font-size:11px;color:var(--dim);margin-top:16px;letter-spacing:1px;text-align:center;border-top:1px solid var(--border);padding-top:12px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Player 2 (top, rotated 180°) -->
+  <div class="pzone p2 idle" id="z2" onclick="tap(1)">
+    <div class="plabel">Oyuncu 2</div>
+    <div class="timer" id="t2">03:00</div>
+    <div class="ot-badge">⚠ Ek Süre</div>
+    <div class="psub" id="s2">Hazır</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="cbtn" id="btn-reset" onclick="doReset()">
+      <span class="ico" id="reset-ico">⏹</span>
+      <span class="lbl" id="reset-lbl">Durdur</span>
+    </button>
+
+    <div class="cinfo">
+      <div class="ctitle" id="gs">Başlamadı</div>
+      <div class="cval" id="mc"></div>
+      <div class="ctip" id="ctip"></div>
+    </div>
+
+    <button class="cbtn" id="btn-settings" onclick="openS()">
+      <span class="ico">⚙</span>
+      <span class="lbl">Ayarlar</span>
+    </button>
+  </div>
+
+  <!-- Player 1 (bottom, normal) -->
+  <div class="pzone p1 idle" id="z1" onclick="tap(0)">
+    <div class="plabel">Oyuncu 1</div>
+    <div class="timer" id="t1">03:00</div>
+    <div class="ot-badge">⚠ Ek Süre</div>
+    <div class="psub" id="s1">Hazır</div>
+  </div>
+
+</div>
+
+<!-- Settings -->
+<div id="soverlay">
+  <div class="spanel">
+    <h2>⏱ Süre Ayarları</h2>
+
+    <div class="ssec">
+      <h3>Oyuncu 1 — Hamle Başına Düşünme Süresi</h3>
+      <div class="srow">
+        <span class="slab">Dakika : Saniye</span>
+        <div class="tinp">
+          <input type="number" id="p1m" min="0" max="59" value="3">
+          <span class="sep">:</span>
+          <input type="number" id="p1s" min="0" max="59" value="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="ssec">
+      <h3>Oyuncu 2 — Hamle Başına Düşünme Süresi</h3>
+      <div class="srow">
+        <span class="slab">Dakika : Saniye</span>
+        <div class="tinp">
+          <input type="number" id="p2m" min="0" max="59" value="3">
+          <span class="sep">:</span>
+          <input type="number" id="p2s" min="0" max="59" value="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="ssec">
+      <h3>Ek Süre (Overtime)</h3>
+      <div class="srow">
+        <span class="slab">Süre bittikten sonra ek süre aktif olsun</span>
+        <div class="tog" id="ottog" onclick="togOT()"></div>
+      </div>
+      <div id="otops" style="display:none;margin-top:12px;">
+        <div class="srow" style="margin-bottom:8px;">
+          <span class="slab">Oyuncu 1 ek süre (saniye)</span>
+          <div class="tinp">
+            <input type="number" id="p1ot" min="5" max="600" value="30" style="width:64px;">
+          </div>
+        </div>
+        <div class="srow">
+          <span class="slab">Oyuncu 2 ek süre (saniye)</span>
+          <div class="tinp">
+            <input type="number" id="p2ot" min="5" max="600" value="30" style="width:64px;">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sacts">
+      <button class="s-cancel" onclick="closeS()">İptal</button>
+      <button class="s-apply" onclick="applyS()">Uygula &amp; Sıfırla</button>
+    </div>
+    <div class="hint">Kısayollar: R = Sıfırla · 1 = Oyuncu 1 bastı · 2 = Oyuncu 2 bastı · S = Ayarlar</div>
+  </div>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+let cfg = { p1t:180, p2t:180, ot:false, p1ot:30, p2ot:30 };
+
+// ── State ────────────────────────────────────────────────────────────────────
+let G = {
+  run:false, started:false,
+  active:-1,
+  rem:[180,180],        // remaining main time (seconds, float)
+  inOT:[false,false],   // in overtime mode
+  otRem:[30,30],        // overtime remaining
+  dead:[false,false],   // timed out
+  moves:0,              // total half-moves (plies)
+  iv:null,
+  paused:false          // paused by reset button first press
+};
+
+function fmt(sec){
+  if(sec<0)sec=0;
+  const m=Math.floor(sec/60), s=Math.floor(sec%60);
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function render(){
+  for(let p=0;p<2;p++){
+    const z=document.getElementById('z'+(p+1));
+    const td=document.getElementById('t'+(p+1));
+    const sd=document.getElementById('s'+(p+1));
+    td.textContent=G.inOT[p]?fmt(G.otRem[p]):fmt(G.rem[p]);
+    z.className='pzone '+(p===1?'p2':'p1');
+    if(G.dead[p]) z.classList.add('dead');
+    else if(G.inOT[p]&&G.active===p&&G.run) z.classList.add('overtime-zone');
+    else if(G.active===p&&G.run) z.classList.add('active');
+    else z.classList.add('idle');
+    if(G.dead[p]) sd.textContent='';
+    else if(!G.started) sd.textContent='Hamle yaptıktan sonra buraya bas';
+    else if(G.active===p&&G.run) sd.textContent=G.inOT[p]?'Ek Süre!':'Düşünüyor...';
+    else sd.textContent='Bekliyor';
+  }
+  const anyDead=G.dead[0]||G.dead[1];
+  const chessMove = G.moves > 0 ? Math.ceil(G.moves / 2) : 0;
+  document.getElementById('mc').textContent=chessMove>0?('Hamle: '+chessMove):'';
+  const tip=document.getElementById('ctip');
+  let gs='';
+  if(anyDead){ gs='Süre Doldu'; tip.style.display='none'; }
+  else if(!G.started){ gs='Başlamadı'; tip.style.display=''; }
+  else if(!G.run){ gs='Duraklatıldı'; tip.style.display='none'; }
+  else{ gs='Oynanıyor'; tip.style.display='none'; }
+  document.getElementById('gs').textContent=gs;
+}
+
+function stopInterval(){
+  clearInterval(G.iv); G.iv=null; G.run=false;
+}
+
+function tick(){
+  const p=G.active;
+  if(p===-1)return;
+  if(G.inOT[p]){
+    G.otRem[p]-=.1;
+    if(G.otRem[p]<=0){G.otRem[p]=0;G.dead[p]=true;stopInterval();}
+  } else {
+    G.rem[p]-=.1;
+    if(G.rem[p]<=0){
+      G.rem[p]=0;
+      if(cfg.ot){G.inOT[p]=true;}
+      else{G.dead[p]=true;stopInterval();}
+    }
+  }
+  render();
+}
+
+function startTimer(){
+  G.run=true;
+  G.paused=false;
+  document.getElementById('reset-ico').textContent='⏹';
+  document.getElementById('reset-lbl').textContent='Durdur';
+  clearInterval(G.iv);
+  G.iv=setInterval(tick,100);
+}
+
+function tap(p){
+  if(G.dead[0]||G.dead[1])return;
+  const opp=1-p;
+
+  // If paused, resume with whoever's turn it was
+  if(G.started && !G.run){
+    startTimer();
+    render();
+    return;
+  }
+
+  // Game not started yet — tapping player starts their OWN timer (they're about to think)
+  if(!G.started){
+    G.active=p;
+    G.started=true;
+    startTimer();
+    const z=document.getElementById('z'+(p+1));
+    z.classList.add('tapped');
+    setTimeout(()=>z.classList.remove('tapped'),150);
+    render();
+    return;
+  }
+
+  // Game running — only the active player can pass their turn
+  if(G.active!==p) return;
+
+  // p finished thinking → reset p's timer for next round, switch to opp
+  G.rem[p]=cfg['p'+(p+1)+'t'];
+  G.inOT[p]=false;
+  G.otRem[p]=cfg['p'+(p+1)+'ot'];
+  G.active=opp;
+  G.moves++;
+
+  // Ripple
+  const z=document.getElementById('z'+(p+1));
+  z.classList.add('tapped');
+  setTimeout(()=>z.classList.remove('tapped'),150);
+  render();
+}
+
+function doReset(){
+  // If game is over (someone timed out) → full reset directly
+  if(G.dead[0]||G.dead[1]){
+    G.paused=false;
+    stopInterval();
+    G={run:false,started:false,active:-1,
+       rem:[cfg.p1t,cfg.p2t],
+       inOT:[false,false],
+       otRem:[cfg.p1ot,cfg.p2ot],
+       dead:[false,false],moves:0,iv:null,paused:false};
+    document.getElementById('reset-ico').textContent='⏹';
+    document.getElementById('reset-lbl').textContent='Durdur';
+    render();
+    return;
+  }
+  // If game is running → pause first
+  if(G.run){
+    stopInterval();
+    G.paused=true;
+    document.getElementById('reset-ico').textContent='↺';
+    document.getElementById('reset-lbl').textContent='Sıfırla';
+    render();
+    return;
+  }
+  // If already paused or not started → full reset
+  G.paused=false;
+  stopInterval();
+  G={run:false,started:false,active:-1,
+     rem:[cfg.p1t,cfg.p2t],
+     inOT:[false,false],
+     otRem:[cfg.p1ot,cfg.p2ot],
+     dead:[false,false],moves:0,iv:null,paused:false};
+  document.getElementById('reset-ico').textContent='⏹';
+  document.getElementById('reset-lbl').textContent='Durdur';
+  render();
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+function openS(){
+  if(G.run)stopInterval();
+  document.getElementById('p1m').value=Math.floor(cfg.p1t/60);
+  document.getElementById('p1s').value=cfg.p1t%60;
+  document.getElementById('p2m').value=Math.floor(cfg.p2t/60);
+  document.getElementById('p2s').value=cfg.p2t%60;
+  document.getElementById('p1ot').value=cfg.p1ot;
+  document.getElementById('p2ot').value=cfg.p2ot;
+  const tog=document.getElementById('ottog');
+  tog.classList.toggle('on',cfg.ot);
+  document.getElementById('otops').style.display=cfg.ot?'block':'none';
+  document.getElementById('soverlay').classList.add('open');
+}
+function closeS(){document.getElementById('soverlay').classList.remove('open');render();}
+function togOT(){
+  const t=document.getElementById('ottog');
+  t.classList.toggle('on');
+  document.getElementById('otops').style.display=t.classList.contains('on')?'block':'none';
+}
+function applyS(){
+  const p=n=>parseInt(n)||0;
+  cfg.p1t=p(document.getElementById('p1m').value)*60+p(document.getElementById('p1s').value)||10;
+  cfg.p2t=p(document.getElementById('p2m').value)*60+p(document.getElementById('p2s').value)||10;
+  cfg.ot=document.getElementById('ottog').classList.contains('on');
+  cfg.p1ot=p(document.getElementById('p1ot').value)||10;
+  cfg.p2ot=p(document.getElementById('p2ot').value)||10;
+  closeS();
+  doReset();
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('soverlay').classList.contains('open'))return;
+  if(e.code==='KeyR'){doReset();}
+  else if(e.code==='Digit1'||e.code==='Numpad1'){tap(0);}
+  else if(e.code==='Digit2'||e.code==='Numpad2'){tap(1);}
+  else if(e.code==='KeyS'){openS();}
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+render();
+
+// ── PWA Setup ────────────────────────────────────────────────────────────────
+const manifest = {
+  name: "Düşünce Saati",
+  short_name: "Düşünce Saati",
+  description: "İki oyunculu satranç saati",
+  start_url: ".",
+  display: "standalone",
+  orientation: "portrait",
+  background_color: "#08080f",
+  theme_color: "#08080f",
+  icons: [
+    {
+      src: "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%2308080f'/><text x='96' y='130' text-anchor='middle' font-size='110'>⏱</text></svg>`),
+      sizes: "192x192",
+      type: "image/svg+xml",
+      purpose: "any maskable"
+    }
+  ]
+};
+const mUrl = 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(manifest))));
+document.getElementById('pwa-manifest').href = mUrl;
+
+// Service worker (scope limited to same origin — needed for installability)
+if('serviceWorker' in navigator){
+  const swCode = `
+    self.addEventListener('install', () => self.skipWaiting());
+    self.addEventListener('activate', () => self.clients.claim());
+    self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response(''))));
+  `;
+  const swBlob = new Blob([swCode], {type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+}
+</script>
+</body>
+</html>
